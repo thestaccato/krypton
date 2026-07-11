@@ -55,6 +55,11 @@ enum Commands {
         #[arg(help = "Path to the vault directory")]
         vault: PathBuf,
     },
+    #[command(about = "Verify vault integrity")]
+    Verify {
+        #[arg(help = "Path to the vault directory")]
+        vault: PathBuf,
+    },
     #[command(about = "Encrypt a single file")]
     Encrypt {
         #[arg(help = "Path to the file to encrypt")]
@@ -218,6 +223,32 @@ fn run(command: Commands) -> Result<()> {
             vault_obj.unlock(&old)?;
             vault_obj.change_password(&old, &new)?;
             println!("Password changed successfully!");
+            Ok(())
+        }
+        Commands::Verify { vault } => {
+            let password = prompt_password("Enter vault password")?;
+            let mut vault_obj = Vault::new(vault);
+
+            if !vault_obj.exists() {
+                return Err(krypton::error::Error::InvalidVault);
+            }
+
+            let (total, verified, missing) = vault_obj.verify(&password)?;
+
+            println!("Vault integrity check:");
+            println!("  Files total:   {}", total);
+            println!("  Files verified: {}", verified);
+
+            if missing.is_empty() {
+                println!("  Status: OK — all files present");
+            } else {
+                println!("  Status: ISSUES FOUND");
+                println!("  Missing files ({}):", missing.len());
+                for name in &missing {
+                    println!("    - {}", name);
+                }
+            }
+
             Ok(())
         }
         Commands::Encrypt { input, output } => {

@@ -195,4 +195,31 @@ impl Vault {
 
         Ok(())
     }
+
+    pub fn verify(&mut self, password: &str) -> Result<(usize, usize, Vec<String>)> {
+        let config_json = fs::read_to_string(self.get_config_path())?;
+        let _config: crate::keystore::VaultConfig =
+            serde_json::from_str(&config_json).map_err(|_| Error::InvalidVault)?;
+
+        self.unlock(password)?;
+
+        let files = self.list()?;
+        let mut missing = Vec::new();
+        let mut verified = 0;
+
+        for (name, _size, _is_dir) in &files {
+            let file_ops = self.file_ops.as_ref().unwrap();
+            let enc_path = file_ops.get_encrypted_file_path(name, &self.path);
+
+            if enc_path.exists() {
+                verified += 1;
+            } else {
+                missing.push(name.clone());
+            }
+        }
+
+        self.lock();
+
+        Ok((files.len(), verified, missing))
+    }
 }
